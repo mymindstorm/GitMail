@@ -7,6 +7,7 @@
 interface ActionEvent {
   parameters: { [key: string]: string };
   formInputs: { [key: string]: string };
+  messageMetadata: { accessToken: string, messageId: string };
 }
 
 function getURLs(messageBody: string) {
@@ -42,7 +43,10 @@ function getURLs(messageBody: string) {
 }
 
 function queryGithub(query: string) {
-  return JSON.parse(accessProtectedResource("https://api.github.com/graphql", "post", JSON.stringify({ query })));
+  const requestResponse = accessProtectedResource("https://api.github.com/graphql", "post", JSON.stringify({ query }));
+  if (requestResponse) {
+    return JSON.parse(requestResponse);
+  }
 }
 
 function getCommentSection(comments: Array<{ author: { login: string }, bodyHTML: string }>) {
@@ -74,12 +78,19 @@ function getBodyWidget(bodyHTML: string) {
 function toggleIssueState(params: ActionEvent) {
   const operation =
     (params.parameters.currentState === "false") ? "closeIssue" : "reopenIssue";
-  const requestResponse = JSON.parse(accessProtectedResource(
+  const getRequestResponse = accessProtectedResource(
     "https://api.github.com/graphql", "post", JSON.stringify({
       query: "mutation { " + operation + '(input:{issueId:"' + params.parameters.id +
         '"}) { clientMutationId } }',
     }),
-    { Accept: "application/vnd.github.starfire-preview+json" }));
+    { Accept: "application/vnd.github.starfire-preview+json" });
+  if (!getRequestResponse) {
+    return;
+  }
+  const requestResponse = JSON.parse(getRequestResponse);
+  if (!requestResponse.errors) {
+    return;
+  }
   const actionResponse =
     CardService.newActionResponseBuilder().setStateChanged(true);
   if (requestResponse.errors) {
@@ -100,12 +111,16 @@ function addComment(params: ActionEvent) {
       createErrorCard("Comment text cannot be blank.", "err")));
     return response;
   }
-  const requestResponse = JSON.parse(accessProtectedResource(
+  const getRequestResponse = accessProtectedResource(
     "https://api.github.com/graphql", "post", JSON.stringify({
       query: 'mutation { addComment (input:{subjectId:"' +
         params.parameters.id + '", body:"' + commentText +
         '"}) { clientMutationId } }',
-    })));
+    }));
+  if (!getRequestResponse) {
+    return;
+  }
+  const requestResponse = JSON.parse(getRequestResponse);
   if (requestResponse.errors) {
     response.setNavigation(CardService.newNavigation().pushCard(
       createErrorCard(requestResponse.errors[0].message, "err")));

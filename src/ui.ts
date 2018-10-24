@@ -1,7 +1,7 @@
 /* tslint:disable:no-reference */
 /// <reference path="utilities.ts" />
 
-function loadAddOn(event) {
+function loadAddOn(event: ActionEvent) {
     const accessToken = event.messageMetadata.accessToken;
     const messageId = event.messageMetadata.messageId;
     GmailApp.setCurrentMessageAccessToken(accessToken);
@@ -42,9 +42,9 @@ function getIssueCard(user: string, repo: string, id: string) {
     let issueData = queryGithub(`query {
         repository(owner:"${user}", name:"${repo}") {
             issue(number:${id}) {
-                title closed id bodyHTML resourcePath createdAt viewerCanUpdate
+                title closed id bodyHTML resourcePath createdAt viewerCanUpdate viewerCanReact
                 author {
-                    avatarUrl login
+                    avatarUrl login url
                 }
                 comments(first:30) {
                     nodes {
@@ -85,7 +85,8 @@ function getIssueCard(user: string, repo: string, id: string) {
     // Issue data section
     const infoSection = CardService.newCardSection();
     infoSection.addWidget(CardService.newKeyValue()
-        .setContent(`Opened by <b>${issueData.author.login}</b> at <time>${issueData.createdAt}</time>`)
+        // tslint:disable-next-line:max-line-length
+        .setContent(`Opened by <a href="${issueData.author.url}">${issueData.author.login}</a> at <time>${issueData.createdAt}</time>`)
         .setIconUrl(issueData.author.avatarUrl)
         .setMultiline(true));
     const bodyWidget = getBodyWidget(issueData.bodyHTML);
@@ -115,19 +116,20 @@ function getIssueCard(user: string, repo: string, id: string) {
         card.addSection(commentSection);
     }
     // Add comment section
-    // TODO: check if user can comment
-    const addCommentSection =
-        CardService.newCardSection()
-            .addWidget(CardService.newTextInput()
-                .setMultiline(true)
-                .setTitle("Add a comment")
-                .setFieldName("commentText"))
-            .addWidget(
-                CardService.newTextButton().setText("Comment").setOnClickAction(
-                    CardService.newAction()
-                        .setFunctionName("addComment")
-                        .setParameters({ id: issueData.id })));
-    card.addSection(addCommentSection);
+    if (issueData.viewerCanReact) {
+        const addCommentSection =
+            CardService.newCardSection()
+                .addWidget(CardService.newTextInput()
+                    .setMultiline(true)
+                    .setTitle("Add a comment")
+                    .setFieldName("commentText"))
+                .addWidget(
+                    CardService.newTextButton().setText("Comment").setOnClickAction(
+                        CardService.newAction()
+                            .setFunctionName("addComment")
+                            .setParameters({ id: issueData.id })));
+        card.addSection(addCommentSection);
+    }
     return card.build();
 }
 
@@ -137,9 +139,9 @@ function getPullCard(user: string, repo: string, id: string) {
             repository(owner:"${user}", name:"${repo}") {
                 pullRequest(number:${id}) {
                     title state id bodyHTML permalink baseRefName headRefName
-                    changedFiles additions deletions viewerCanUpdate
+                    changedFiles additions deletions viewerCanUpdate viewerCanReact
                     author {
-                        avatarUrl login
+                        avatarUrl login url
                     }
                     comments(first:30) {
                         nodes {
@@ -148,6 +150,9 @@ function getPullCard(user: string, repo: string, id: string) {
                                 login
                             }
                         }
+                    }
+                    commits {
+                        totalCount
                     }
                 }
             }
@@ -163,16 +168,23 @@ function getPullCard(user: string, repo: string, id: string) {
     }
     pullData = pullData.data.repository.pullRequest;
     // Set header image
-    let pullImage: string;
+    let pullImage = "";
+    let actionString = "";
     switch (pullData.state) {
         case "CLOSED":
             pullImage = "https://raw.githubusercontent.com/mymindstorm/GitMail/master/img/pull-closed.png";
+            // tslint:disable-next-line:max-line-length
+            actionString = `wanted to merge <font color="#274466"><b>${pullData.headRefName}</b></font> into <font color="#274466"><b>${pullData.baseRefName}</b></font>`;
             break;
         case "OPEN":
             pullImage = "https://raw.githubusercontent.com/mymindstorm/GitMail/master/img/pull-open.png";
+            // tslint:disable-next-line:max-line-length
+            actionString = `wants to merge <font color="#274466"><b>${pullData.headRefName}</b></font> into <font color="#274466"><b>${pullData.baseRefName}</b></font>`;
             break;
         case "MERGED":
             pullImage = ""; // MERGED IMAGE
+            // tslint:disable-next-line:max-line-length
+            actionString = `had <font color="#274466"><b>${pullData.headRefName}</b></font> merged into <font color="#274466"><b>${pullData.baseRefName}</b></font>`;
             break;
         default:
             break;
@@ -186,20 +198,44 @@ function getPullCard(user: string, repo: string, id: string) {
         .setImageAltText("Pull Request"));
     // Pull data section
     const infoSection = CardService.newCardSection();
+    let commitString = "";
+    if (pullData.commits.totalCount === 1) {
+        commitString = "commit";
+    } else {
+        commitString = "commits";
+    }
+    let fileString = "";
+    if (pullData.changedFiles === 1) {
+        fileString = "file";
+    } else {
+        fileString = "files";
+    }
+    let additionString = "";
+    if (pullData.additions === 1) {
+        additionString = "addition";
+    } else {
+        additionString = "additions";
+    }
+    let deletionString = "";
+    if (pullData.deletions === 1) {
+        deletionString = "deletion";
+    } else {
+        deletionString = "deletions";
+    }
     infoSection.addWidget(CardService.newKeyValue()
-        // tslint:disable-next-line:max-line-length
-        .setContent(`<b>${pullData.author.login}</b> wants to merge/merged ${pullData.headRefName} into ${pullData.baseRefName}`)
+        .setContent(`<a href="${pullData.author.url}">${pullData.author.login}</a> ${actionString}`)
         .setIconUrl(pullData.author.avatarUrl)
         .setMultiline(true));
     infoSection.addWidget(CardService.newKeyValue()
         // tslint:disable-next-line:max-line-length
-        .setContent(`XX commits changing ${pullData.changedFiles} files with ${pullData.additions} additions and ${pullData.deletions} deletions`)
+        .setContent(`<b>${pullData.commits.totalCount} ${commitString}</b> changing <b>${pullData.changedFiles} ${fileString}</b> with <b><font color="#28a745">${pullData.additions}</font> ${additionString}</b> and <b><font color="#cb2431">${pullData.deletions}</font> ${deletionString}</b>`)
         .setMultiline(true));
+    card.addSection(infoSection);
+    // Pull body section
     const bodyWidget = getBodyWidget(pullData.bodyHTML);
     if (bodyWidget) {
-        infoSection.addWidget(bodyWidget);
+        card.addSection(CardService.newCardSection().setHeader("Description").addWidget(bodyWidget));
     }
-    card.addSection(infoSection);
     // Pull actions widget
     const actionButtons = CardService.newButtonSet().addButton(
         CardService.newTextButton()
@@ -212,26 +248,27 @@ function getPullCard(user: string, repo: string, id: string) {
         card.addSection(commentSection);
     }
     // Add comment section
-    // TODO: check if user can comment
-    const addCommentSection =
-        CardService.newCardSection()
-            .addWidget(CardService.newTextInput()
-                .setMultiline(true)
-                .setTitle("Add a comment")
-                .setFieldName("commentText"))
-            .addWidget(
-                CardService.newTextButton().setText("Comment").setOnClickAction(
-                    CardService.newAction()
-                        .setFunctionName("addComment")
-                        .setParameters({ id: pullData.id })));
-    card.addSection(addCommentSection);
+    if (pullData.viewerCanReact) {
+        const addCommentSection =
+            CardService.newCardSection()
+                .addWidget(CardService.newTextInput()
+                    .setMultiline(true)
+                    .setTitle("Add a comment")
+                    .setFieldName("commentText"))
+                .addWidget(
+                    CardService.newTextButton().setText("Comment").setOnClickAction(
+                        CardService.newAction()
+                            .setFunctionName("addComment")
+                            .setParameters({ id: pullData.id })));
+        card.addSection(addCommentSection);
+    }
     return card.build();
 }
 
 // Mutation response card
 function createErrorCard(message: string, type: string) {
-    let imageURL: string;
-    let altText: string;
+    let imageURL = "";
+    let altText = "";
     switch (type) {
         case "warn":
             imageURL = "https://raw.githubusercontent.com/mymindstorm/GitMail/master/img/confused.png";

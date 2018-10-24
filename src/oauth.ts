@@ -113,6 +113,7 @@ function getOAuthService() {
  *           the user. Also sets a timer to close the window
  *           automatically.
  */
+// @ts-ignore
 function authCallback(callbackRequest) {
   const authorized = getOAuthService().handleCallback(callbackRequest);
   if (authorized) {
