@@ -1,0 +1,31 @@
+{
+  "dependencies": {
+    "libraries": [{
+      "userSymbol": "OAuth2",
+      "libraryId": "1B7FSrk5Zi6L1rSxxTDgDEUsPzlukDsi4KGuTMorsTQHhGBzBkMun4iDF",
+      "version": "30"
+    }]
+  },
+  "exceptionLogging": "STACKDRIVER",
+  "oauthScopes": ["https://www.googleapis.com/auth/gmail.addons.current.message.readonly", "https://www.googleapis.com/auth/gmail.addons.execute", "https://www.googleapis.com/auth/script.external_request", "https://www.googleapis.com/auth/script.locale"],
+  "gmail": {
+    "name": "GitMail",
+    "logoUrl": "https://git-scm.com/images/logos/downloads/Git-Icon-1788C.png",
+    "contextualTriggers": [{
+      "unconditional": {
+      },
+      "onTriggerFunction": "loadAddOn"
+    }],
+    "universalActions": [{
+      "text": "About",
+      "runFunction": "createAboutResponse"
+    }, {
+      "text": "Settings",
+      "runFunction": "createSettingsResponse"
+    }],
+    "primaryColor": "#24292es",
+    "openLinkUrlPrefixes": ["*"],
+    "version": "TRUSTED_TESTER_V2",
+    "useLocaleFromApp": true
+  }
+}
