@@ -1,6 +1,6 @@
 # GitMail
 
-It's a GitHub client for Gmail, currently a work in progress.
+It's a very basic GitHub client for Gmail, currently a work in progress.
 
 ## Why?
 
