@@ -75,6 +75,22 @@ function getBodyWidget(bodyHTML: string) {
   }
 }
 
+function sanitizeInput(input: string) {
+  const entityMap: {[key: string]: string} = {
+    '"': "&quot;",
+    "&": "&amp;",
+    "'": "&#39;",
+    "/": "&#x2F;",
+    "<": "&lt;",
+    "=": "&#x3D;",
+    ">": "&gt;",
+    "`": "&#x60;",
+  };
+  return String(input).replace(/[&<>"'`=\/]/g, function fromEntityMap(s) {
+    return entityMap[s];
+  });
+}
+
 function toggleIssueState(params: ActionEvent) {
   const operation =
     (params.parameters.currentState === "false") ? "closeIssue" : "reopenIssue";
@@ -97,14 +113,15 @@ function toggleIssueState(params: ActionEvent) {
     actionResponse.setNavigation(CardService.newNavigation().pushCard(
       createErrorCard(requestResponse.errors[0].message, "err")));
   } else {
+    const operationString = (operation === "reopenIssue") ? "Issue reopened" : "Issue closed";
     actionResponse.setNavigation(CardService.newNavigation().pushCard(
-      createErrorCard("Issue closed/opened", "success")));
+      createErrorCard(operationString, "success")));
   }
   return actionResponse.build();
 }
 
 function addComment(params: ActionEvent) {
-  const commentText = params.formInputs.commentText;
+  const commentText = sanitizeInput(String(params.formInputs.commentText));
   const response = CardService.newActionResponseBuilder().setStateChanged(true);
   if (!commentText) {
     response.setNavigation(CardService.newNavigation().pushCard(
@@ -126,7 +143,7 @@ function addComment(params: ActionEvent) {
       createErrorCard(requestResponse.errors[0].message, "err")));
   } else {
     response.setNavigation(CardService.newNavigation().pushCard(
-      createErrorCard("Comment created.", "success")));
+      createErrorCard("Comment created", "success")));
   }
   return response.build();
 }
